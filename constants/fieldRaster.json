@@ -1,0 +1,105 @@
+{
+  "generated_at": "2026-09-19T00:00:00Z",
+  "rendered_at": "2026-09-19T09:13:00.368Z",
+  "method": "heuristic-v6-uncalibrated",
+  "palette": "scoreRamp-v1",
+  "bounds": {
+    "south": 48.9,
+    "north": 54.95,
+    "west": 14.05,
+    "east": 24.25
+  },
+  "size": {
+    "width": 584,
+    "height": 562
+  },
+  "km_per_pixel": 1.2,
+  "interpolation": {
+    "kind": "idw-tapered",
+    "power": 2,
+    "radius_km": 3.34
+  },
+  "source": {
+    "kind": "dwd-fields",
+    "grid_step": 0.02,
+    "cells": 102638,
+    "scored_cells": 102638,
+    "cells_with_forecast": 102638,
+    "snapshot_synced_at": null,
+    "run_date": "2026-09-19T00:00:00Z",
+    "points": 102638,
+    "seconds": 391.5,
+    "skipped": {
+      "noData": 0,
+      "offLand": 51892
+    },
+    "provenance_shares": {
+      "fine": 41.8,
+      "blended": 2.9,
+      "coarse": 55.4,
+      "none": 0
+    }
+  },
+  "frames": [
+    {
+      "offset": 0,
+      "file": "field-day0.png",
+      "bytes": 62818,
+      "width": 584,
+      "height": 562,
+      "scored_pixels": 219174,
+      "scored_cells": 102638,
+      "min": 18,
+      "max": 63.3,
+      "mean": 40.4
+    },
+    {
+      "offset": 1,
+      "file": "field-day1.png",
+      "bytes": 69527,
+      "width": 584,
+      "height": 562,
+      "scored_pixels": 219174,
+      "scored_cells": 102638,
+      "min": 18,
+      "max": 71.9,
+      "mean": 42.6
+    },
+    {
+      "offset": 2,
+      "file": "field-day2.png",
+      "bytes": 63928,
+      "width": 584,
+      "height": 562,
+      "scored_pixels": 219174,
+      "scored_cells": 102638,
+      "min": 19.1,
+      "max": 78.3,
+      "mean": 47.1
+    },
+    {
+      "offset": 3,
+      "file": "field-day3.png",
+      "bytes": 61120,
+      "width": 584,
+      "height": 562,
+      "scored_pixels": 219174,
+      "scored_cells": 102638,
+      "min": 24,
+      "max": 84.9,
+      "mean": 50.3
+    },
+    {
+      "offset": 4,
+      "file": "field-day4.png",
+      "bytes": 62218,
+      "width": 584,
+      "height": 562,
+      "scored_pixels": 219174,
+      "scored_cells": 102638,
+      "min": 24,
+      "max": 85,
+      "mean": 50.4
+    }
+  ]
+}

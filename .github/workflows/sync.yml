@@ -1,0 +1,102 @@
+name: sync-data (cloud producer)
+
+# The producer that runs WITHOUT the owner laptop.
+# Why here: Actions minutes are FREE for public repositories, and this repository is the one that must receive
+# the published files anyway. The workflow checks out the PRIVATE code repository with a read-only token,
+# runs the pipeline exactly as the laptop does, asks the run own verdict, and only then commits here.
+# The verdict gate is the point: a run that is not healthy publishes NOTHING and the job fails loudly, so the
+# owner (possibly abroad) sees it in the Actions tab.
+# Schedule 03:00/09:00/15:00 UTC = 05:00/11:00/17:00 in Poland (summer). GitHub may delay scheduled runs.
+
+on:
+  schedule:
+    - cron: '0 3,9,15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-data
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the DATA repository (this one)
+        uses: actions/checkout@v4
+        with:
+          path: data
+
+      - name: Check out the CODE repository (private, read-only token)
+        uses: actions/checkout@v4
+        with:
+          repository: dariusz-piskorski/grzybobranie
+          token: ${{ secrets.APP_REPO_TOKEN }}
+          path: app
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Restore the pipeline state (DWD download cache, our own archive, IMGW history)
+        uses: actions/cache@v4
+        with:
+          path: app/scripts/data
+          key: pipeline-data-v1
+          restore-keys: |
+            pipeline-data-v1
+
+      - name: Install dependencies (scripts only)
+        working-directory: app
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run the pipeline
+        working-directory: app
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -o pipefail
+          node scripts/sync-all.mjs 2>&1 | tee ../run.log
+
+      - name: Ask for the run own verdict
+        working-directory: app
+        run: |
+          set -o pipefail
+          node scripts/dwd-run-check.mjs 2>&1 | tee -a ../run.log
+
+      - name: Report what the archive holds (the one asset that cannot be rebuilt)
+        working-directory: app
+        run: |
+          echo "archive days: $(ls scripts/data/dwd-history/*.json 2>/dev/null | wc -l)"
+          ls -1 scripts/data/dwd-history/*.json 2>/dev/null | tail -3 || echo "no archive days present"
+
+      - name: Publish the three data paths into this repository
+        working-directory: data
+        run: |
+          mkdir -p constants assets/heatmap
+          cp ../app/constants/latestReports.json constants/latestReports.json
+          cp ../app/constants/fieldRaster.json constants/fieldRaster.json
+          cp ../app/assets/heatmap/*.png assets/heatmap/
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- constants/latestReports.json constants/fieldRaster.json assets/heatmap
+          if git diff --cached --quiet; then
+            echo "publish: nothing changed since the last run"
+          else
+            git commit -m "chore(data): publish the snapshot, the reports and the field frames for $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Keep the run log as evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-log
+          path: run.log
+          if-no-files-found: ignore
+          retention-days: 14

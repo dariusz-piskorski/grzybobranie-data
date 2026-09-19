@@ -30,6 +30,17 @@ jobs:
         with:
           path: data
 
+      - name: Refuse to start without the read-only code token
+        # WHY (measured 19/09/2026, the first cloud run): it died at the next step with
+        # "Not Found - https://docs.github.com/rest/repos/repos#get-a-repository". An UNSET `APP_REPO_TOKEN`
+        # makes actions/checkout fall back to this repository's own token, which cannot see the PRIVATE code
+        # repository - so a missing secret looked like a missing repository. This step names the real problem.
+        run: |
+          if [ -z "${{ secrets.APP_REPO_TOKEN }}" ]; then
+            echo "::error title=Missing secret APP_REPO_TOKEN::Set it in this repository under Settings -> Secrets and variables -> Actions. It must be a fine-grained token with read-only 'Contents' access to dariusz-piskorski/grzybobranie (the private code repository). Until it exists this workflow cannot read the pipeline code."
+            exit 1
+          fi
+
       - name: Check out the CODE repository (private, read-only token)
         uses: actions/checkout@v4
         with:

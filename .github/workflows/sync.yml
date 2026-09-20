@@ -30,16 +30,37 @@ jobs:
         with:
           path: data
 
-      - name: Refuse to start without the read-only code token
-        # WHY (measured 19/09/2026, the first cloud run): it died at the next step with
+      - name: Prove the token can read the code repository BEFORE checking it out
+        # WHY (measured 19/09 and 20/09/2026, two cloud runs): they died at the next step with
         # "Not Found - https://docs.github.com/rest/repos/repos#get-a-repository". An UNSET `APP_REPO_TOKEN`
         # makes actions/checkout fall back to this repository's own token, which cannot see the PRIVATE code
-        # repository - so a missing secret looked like a missing repository. This step names the real problem.
+        # repository - so a missing secret looked like a missing repository. On 20/09 the secret EXISTED and the
+        # checkout still failed, which means the TOKEN cannot see that repository (GitHub answers 404, never 403,
+        # for a repository a token cannot read). This step asks GitHub directly and names the cause it finds.
+        env:
+          APP_REPO_TOKEN: ${{ secrets.APP_REPO_TOKEN }}
         run: |
-          if [ -z "${{ secrets.APP_REPO_TOKEN }}" ]; then
-            echo "::error title=Missing secret APP_REPO_TOKEN::Set it in this repository under Settings -> Secrets and variables -> Actions. It must be a fine-grained token with read-only 'Contents' access to dariusz-piskorski/grzybobranie (the private code repository). Until it exists this workflow cannot read the pipeline code."
+          set -uo pipefail
+          ask() {
+            curl -sS -o "$2" -w '%{http_code}' \
+              -H "Authorization: Bearer ${APP_REPO_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' "$1" 2>/dev/null || echo 000
+          }
+          user_code=$(ask https://api.github.com/user /tmp/user.json)
+          login=$(sed -n 's/.*"login"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/user.json | head -1)
+          repo_code=$(ask https://api.github.com/repos/dariusz-piskorski/grzybobranie /tmp/repo.json)
+          echo "GET /user -> HTTP ${user_code} (account: ${login:-unknown})"
+          echo "GET /repos/dariusz-piskorski/grzybobranie -> HTTP ${repo_code}"
+          if [ "${user_code}" != "200" ]; then
+            echo "::error title=APP_REPO_TOKEN is not a usable GitHub token (HTTP ${user_code})::GitHub would not identify this token at all, so the value is not a personal access token, or it has expired. It must come from github.com/settings/tokens - the values in .env (Supabase keys) are NOT it."
             exit 1
           fi
+          if [ "${repo_code}" != "200" ]; then
+            echo "::error title=The token of ${login} cannot read the private code repository (HTTP ${repo_code})::Check in this order: (1) the token is a GitHub PAT, not a key from .env; (2) FINE-GRAINED: Repository access must explicitly include dariusz-piskorski/grzybobranie, with Contents set to Read-only; (3) CLASSIC: the repo scope is required; (4) the token has not expired and belongs to an account that can see that private repository - ${login} just proved it cannot; (5) the secret is a REPOSITORY secret here, not an Environment or Dependabot secret."
+            exit 1
+          fi
+          echo "::notice title=Token OK::${login} can read dariusz-piskorski/grzybobranie"
 
       - name: Check out the CODE repository (private, read-only token)
         uses: actions/checkout@v4
